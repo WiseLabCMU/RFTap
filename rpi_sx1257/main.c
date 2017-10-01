@@ -40,15 +40,15 @@ typedef struct sx1257_registerSetting {
 static const registerSetting_t preferredSettings[]=
 {
 	{0x00, 0x01},//	RegMode
-	{0x01, 0xC8},//	RegFrfRxMsb
-	{0x02, 0x00},//	RegFrfRxMid
-	{0x03, 0x00},//	RegFrfRxLsb
-	{0x04, 0xCB},//	RegFrfTxMsb
-	{0x05, 0x55},//	RegFrfTxMid
-	{0x06, 0x55},//	RegFrfTxLsb
+	{0x01, 0xCD},//	RegFrfRxMsb
+	{0x02, 0x8E},//	RegFrfRxMid
+	{0x03, 0x39},//	RegFrfRxLsb
+	{0x04, 0xCD},//	RegFrfTxMsb
+	{0x05, 0x8E},//	RegFrfTxMid
+	{0x06, 0x39},//	RegFrfTxLsb
 	//{0x07, 0x21},//	RegVersion
 	{0x08, 0x2E},//	RegTxGain
-	{0x09, 0x1F},//	RegTxMixerTank
+	//{0x09, 0x1F},//	RegTxMixerTank
 	{0x0A, 0x60},//	RegTxBw
 	{0x0B, 0x02},//	RegTxDacBw
 	{0x0C, 0x3F},//	RegRxAnaGain
@@ -71,7 +71,7 @@ static const registerSetting_t preferredSettings[]=
 volatile int eventCounter = 0;
 volatile uint8_t ready = 0;
 
-#define numSamples 128
+#define numSamples 1024
 uint8_t iq[numSamples] = {0,};
 
 int sx1257_write_register(uint8_t reg, uint8_t value)
@@ -229,6 +229,7 @@ static void hex_dump(const void *src, size_t length, size_t line_size,
 	printf("%s | ", prefix);
 	while (length-- > 0) {
 		printf("%02X ", *address++);
+		//printf("%d ", *address++);
 		if (!(++i % line_size) || (length == 0 && i % line_size)) {
 			if (length == 0) {
 				while (i++ % line_size)
@@ -247,7 +248,7 @@ static void hex_dump(const void *src, size_t length, size_t line_size,
 }
 
 int
-fpga_read(uint8_t *data, uint8_t len)
+fpga_read(uint8_t *data, uint16_t len)
 {
 	int ret;
 	struct spi_ioc_transfer transfer = {
@@ -259,7 +260,8 @@ fpga_read(uint8_t *data, uint8_t len)
 		.bits_per_word = bits,
 	};
 	
-	buf[transfer.len++] = 0xa5;
+	//buf[transfer.len++] = 0xa5;
+	//buf[transfer.len++] = 0xa5;
 	transfer.len += len;
 
 	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &transfer);
@@ -282,7 +284,12 @@ void myInterrupt(void) {
    	eventCounter++;
    	ready = 1;
    	fpga_read(iq, numSamples);
-   	hex_dump(iq, numSamples, numSamples+10, "IQ");
+   	//hex_dump(iq, numSamples, numSamples, "IQ");
+   	int i;
+   	//for(i = 0; i < numSamples; i++)
+		//printf("%02x ", iq[i]);
+   	printf("%s\n", iq);
+	//printf("\n");
 }
 
 int main(int argc, char* argv[]){
@@ -358,7 +365,6 @@ int main(int argc, char* argv[]){
 	{
 		if(ready){
 			ready = 0;
-			//printf( "%d I: %02x Q:%02x\n", eventCounter, I, Q);
 		}
 	}
 
