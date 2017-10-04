@@ -26,11 +26,11 @@
 static uint32_t mode = 0;
 static uint8_t bits = 8;
 static uint32_t speed = 7800000;
-static uint16_t delay_usecs = 0;
+static uint16_t delay_usecs = 10;
 
 static int fd, fpga_fd;
 
-static uint8_t buf[1024];
+static uint8_t buf[2048];
 
 typedef struct sx1257_registerSetting {
   uint8_t addr;
@@ -71,7 +71,7 @@ static const registerSetting_t preferredSettings[]=
 volatile int eventCounter = 0;
 volatile uint8_t ready = 0;
 
-#define numSamples 1024
+#define numSamples 1064
 uint8_t iq[numSamples] = {0,};
 
 int sx1257_write_register(uint8_t reg, uint8_t value)
@@ -169,10 +169,10 @@ int sx1257_init(char * spi_path)
 	}
 
 	// Check that the properties have been set
-	printf("SPI: %s\n", spi_path);
-	printf("SPI Mode is: %d\n", mode);
-	printf("SPI Bits is: %d\n", bits);
-	printf("SPI Speed is: %d\n", speed);
+	// printf("SPI: %s\n", spi_path);
+	// printf("SPI Mode is: %d\n", mode);
+	// printf("SPI Bits is: %d\n", bits);
+	// printf("SPI Speed is: %d\n", speed);
 
 	return 0;
 }
@@ -210,10 +210,10 @@ int fpga_init(char * spi_path)
 	}
 
 	// Check that the properties have been set
-	printf("SPI: %s\n", spi_path);
-	printf("SPI Mode is: %d\n", mode);
-	printf("SPI Bits is: %d\n", bits);
-	printf("SPI Speed is: %d\n", speed);
+	// printf("SPI: %s\n", spi_path);
+	// printf("SPI Mode is: %d\n", mode);
+	// printf("SPI Bits is: %d\n", bits);
+	// printf("SPI Speed is: %d\n", speed);
 
 	return 0;
 }
@@ -260,8 +260,6 @@ fpga_read(uint8_t *data, uint16_t len)
 		.bits_per_word = bits,
 	};
 	
-	//buf[transfer.len++] = 0xa5;
-	//buf[transfer.len++] = 0xa5;
 	transfer.len += len;
 
 	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &transfer);
@@ -270,9 +268,9 @@ fpga_read(uint8_t *data, uint16_t len)
 	else
 	{
 		int j;
-		for (j = 0; j < transfer.len; j++)
+		for (j = 0; j < transfer.len-7; j++)
 		{
-			data[j] = buf[j];
+			data[j] = buf[j+7];
 		}
 	}
 
@@ -284,12 +282,6 @@ void myInterrupt(void) {
    	eventCounter++;
    	ready = 1;
    	fpga_read(iq, numSamples);
-   	//hex_dump(iq, numSamples, numSamples, "IQ");
-   	int i;
-   	//for(i = 0; i < numSamples; i++)
-		//printf("%02x ", iq[i]);
-   	printf("%s\n", iq);
-	//printf("\n");
 }
 
 int main(int argc, char* argv[]){
@@ -299,46 +291,47 @@ int main(int argc, char* argv[]){
 	
 	uint8_t value = 0;
 	sx1257_read_register(0x07, &value);
-	printf("Chip Version: %02x\n", value);
+	// printf("Chip Version: %02x\n", value);
 
 	sx1257_read_register(0x01, &value);
-	printf("RegFrfRxMsb: %02x\n", value);
+	// printf("RegFrfRxMsb: %02x\n", value);
 
 	sx1257_read_register(0x02, &value);
-	printf("RegFrfRxMid: %02x\n", value);
+	// printf("RegFrfRxMid: %02x\n", value);
 
 	sx1257_read_register(0x03, &value);
-	printf("RegFrfRxLsb: %02x\n", value);
+	// printf("RegFrfRxLsb: %02x\n", value);
 
 	sx1257_read_register(0x0C, &value);
-	printf("RegRxAnaGain: %02x\n", value);
+	// printf("RegRxAnaGain: %02x\n", value);
 
 	sx1257_read_register(0x0D, &value);
-	printf("RegRxBw: %02x\n", value);
+	// printf("RegRxBw: %02x\n", value);
 
 	sx1257_read_register(0x0E, &value);
-	printf("RegRxPLLBw: %02x\n", value);
+	// printf("RegRxPLLBw: %02x\n", value);
 
 	sx1257_read_register(0x0F, &value);
-	printf("RegDioMapping: %02x\n", value);
+	// printf("RegDioMapping: %02x\n", value);
 	
 	sx1257_read_register(0x10, &value);
-	printf("RegClkSelect: %02x\n", value);
+	// printf("RegClkSelect: %02x\n", value);
 	
 	sx1257_read_register(0x11, &value);
-	printf("RegModeStatus: %02x\n", value);
+	// printf("RegModeStatus: %02x\n", value);
 	
 	sx1257_read_register(0x1A, &value);
-	printf("RegLowBatThres: %02x\n", value);
+	// printf("RegLowBatThres: %02x\n", value);
 	
 	sx1257_read_register(0x19, &value);
-	printf("RegTestPdsTrim: %02x\n", value);
+	// printf("RegTestPdsTrim: %02x\n", value);
 	
 	sx1257_write_register(0x00, 0x03);
 
 	close(fd);
 
 	speed = 15600000;
+	//speed = 31200000;
 	
 	fpga_init(FPGA_PATH);
 
@@ -355,17 +348,25 @@ int main(int argc, char* argv[]){
 
   	// set Pin 25/0 generate an interrupt on high-to-low transitions
   	// and attach myInterrupt() to the interrupt
-	if ( wiringPiISR (IRQ, INT_EDGE_FALLING, &myInterrupt) < 0 ) {
+	if ( wiringPiISR (IRQ, INT_EDGE_RISING, &myInterrupt) < 0 ) {
 		fprintf (stderr, "Unable to setup ISR: %s\n", strerror (errno));
 		return 1;
 	}
 
 	// display counter value every second.
-	while (1) 
+	int j = 0;
+	while(j < 5000)
 	{
 		if(ready){
 			ready = 0;
+        	int i;
+        	for(i = 0; i < numSamples-7; i++)
+        		if((i < 1000) || (iq[i] < 64))
+            		printf("%d,", iq[i]);
+        	//printf("\n");
+        	j++;
 		}
+        //usleep(1000);
 	}
 
 	return 0;
